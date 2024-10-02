@@ -8,11 +8,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
@@ -26,21 +26,20 @@ class HomeFragment : Fragment() {
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private lateinit var deviceList: RecyclerView
     private lateinit var deviceAdapter: BluetoothDeviceAdapter
-    private lateinit var sensorDataText: TextView
     private var devices: MutableList<BluetoothDevice> = mutableListOf()
 
-    // 用於處理藍牙權限請求結果的 ActivityResultLauncher
-    private val requestBluetoothPermissionsLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-            val granted = permissions[Manifest.permission.BLUETOOTH_CONNECT] == true &&
-                    permissions[Manifest.permission.BLUETOOTH_SCAN] == true
+    // 權限請求代碼
+    private val REQUEST_BLUETOOTH_PERMISSION = 1
 
-            if (granted) {
-                // 權限授予後執行配對裝置顯示和掃描新裝置
-                displayPairedDevices()
+    // 用於處理藍牙啟用的 ActivityResultLauncher
+    private val requestBluetoothEnableLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == android.app.Activity.RESULT_OK) {
+                // 藍牙已啟用
                 scanForNewDevices()
             } else {
-                Toast.makeText(context, "需要藍牙權限來顯示設備", Toast.LENGTH_SHORT).show()
+                // 藍牙未啟用
+                Toast.makeText(requireContext(), "請啟用藍牙", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -71,41 +70,44 @@ class HomeFragment : Fragment() {
             // 檢查藍牙權限
             checkBluetoothPermission()
         } else {
-            // 如果藍牙未開啟，提示用戶開啟藍牙
-            Toast.makeText(context, "請先開啟藍牙", Toast.LENGTH_SHORT).show()
-            // 請求開啟藍牙
+            // 如果藍牙未開啟，請求用戶啟用藍牙
             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-            startActivityForResult(enableBtIntent, 1)
+            requestBluetoothEnableLauncher.launch(enableBtIntent)
         }
     }
 
     private fun checkBluetoothPermission() {
-        if (ActivityCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.BLUETOOTH_CONNECT
-            ) != PackageManager.PERMISSION_GRANTED || ActivityCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.BLUETOOTH_SCAN
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            // 如果權限未被授予，請求權限
-            requestBluetoothPermissionsLauncher.launch(
-                arrayOf(
-                    Manifest.permission.BLUETOOTH_CONNECT,
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    requireContext(),
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED || ActivityCompat.checkSelfPermission(
+                    requireContext(),
                     Manifest.permission.BLUETOOTH_SCAN
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                // 請求藍牙相關權限
+                ActivityCompat.requestPermissions(
+                    requireActivity(),
+                    arrayOf(
+                        Manifest.permission.BLUETOOTH_CONNECT,
+                        Manifest.permission.BLUETOOTH_SCAN
+                    ),
+                    REQUEST_BLUETOOTH_PERMISSION
                 )
-            )
-        } else {
-            // 如果權限已被授予，執行取得配對裝置和掃描新裝置
-            try {
+            } else {
+                // 權限已授權，開始掃描
                 displayPairedDevices()
                 scanForNewDevices()
-            } catch (e: SecurityException) {
-                Toast.makeText(requireContext(), "缺少藍牙權限，無法繼續操作", Toast.LENGTH_SHORT).show()
             }
+        } else {
+            // 對於 Android 12 以下版本，不需要請求這些權限
+            displayPairedDevices()
+            scanForNewDevices()
         }
     }
 
+    // 顯示已配對的裝置
     private fun displayPairedDevices() {
         try {
             val pairedDevices: Set<BluetoothDevice>? = bluetoothAdapter.bondedDevices
@@ -117,37 +119,65 @@ class HomeFragment : Fragment() {
                 }
                 deviceAdapter.updateDevices(devices)
             } else {
-                // 顯示沒有配對設備的提示
-                Toast.makeText(context, "沒有找到配對的設備", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "沒有配對的設備", Toast.LENGTH_SHORT).show()
             }
         } catch (e: SecurityException) {
-            Toast.makeText(requireContext(), "缺少藍牙權限，無法顯示配對裝置", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "權限不足：無法顯示配對設備", Toast.LENGTH_SHORT).show()
         }
     }
 
+    // 掃描新裝置
     private fun scanForNewDevices() {
         try {
-            // 註冊發現裝置的廣播接收器
             val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
             requireActivity().registerReceiver(receiver, filter)
 
-            // 啟動裝置搜尋
             if (bluetoothAdapter.isDiscovering) {
                 bluetoothAdapter.cancelDiscovery()
             }
             bluetoothAdapter.startDiscovery()
-            Toast.makeText(context, "開始掃描藍牙裝置...", Toast.LENGTH_SHORT).show()
+
+            Toast.makeText(context, "開始掃描藍牙裝置", Toast.LENGTH_SHORT).show()
         } catch (e: SecurityException) {
-            Toast.makeText(requireContext(), "缺少藍牙掃描權限", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "權限不足：無法掃描裝置", Toast.LENGTH_SHORT).show()
         }
     }
 
-    // 廣播接收器來處理新發現的裝置
+    // 檢查是否已經加入裝置列表
+    private fun isDeviceAlreadyAdded(device: BluetoothDevice): Boolean {
+        return devices.any { it.address == device.address }
+    }
+
+    // 處理權限請求結果
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_BLUETOOTH_PERMISSION) {
+            if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+                // 權限已授權，繼續執行
+                displayPairedDevices()
+                scanForNewDevices()
+            } else {
+                // 權限被拒絕
+                Toast.makeText(context, "需要藍牙權限來顯示設備", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun connectToDevice(device: BluetoothDevice) {
+        // 實作藍牙連接邏輯
+    }
+
+    // 藍牙掃描結果的 BroadcastReceiver
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (BluetoothDevice.ACTION_FOUND == intent?.action) {
+            val action: String? = intent?.action
+            if (BluetoothDevice.ACTION_FOUND == action) {
                 val device: BluetoothDevice? =
-                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    intent?.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
                 device?.let {
                     if (!isDeviceAlreadyAdded(it)) {
                         devices.add(it)
@@ -158,23 +188,9 @@ class HomeFragment : Fragment() {
         }
     }
 
-    // 檢查裝置是否已經存在於列表中
-    private fun isDeviceAlreadyAdded(device: BluetoothDevice): Boolean {
-        for (existingDevice in devices) {
-            if (existingDevice.address == device.address) {
-                return true
-            }
-        }
-        return false
-    }
-
     override fun onDestroy() {
         super.onDestroy()
-        // 取消註冊廣播接收器
+        // 取消註冊 BroadcastReceiver
         requireActivity().unregisterReceiver(receiver)
-    }
-
-    private fun connectToDevice(device: BluetoothDevice) {
-        // 實作藍牙連接邏輯
     }
 }
