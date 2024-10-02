@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">SmartBikeSystem</string>
+    <string name="title_home">Home</string>
+    <string name="title_dashboard">Sensor</string>
+    <string name="title_notifications">Maps</string>
+</resources>
