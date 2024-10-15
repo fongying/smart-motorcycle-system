@@ -1,12 +1,6 @@
 pluginManagement {
     repositories {
-        google {
-            content {
-                includeGroupByRegex("com\\.android.*")
-                includeGroupByRegex("com\\.google.*")
-                includeGroupByRegex("androidx.*")
-            }
-        }
+        google() // 這樣保證包含所有 Google Maven 提供的插件
         mavenCentral()
         gradlePluginPortal()
     }
@@ -21,4 +15,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "SmartBikeSystem"
 include(":app")
- 

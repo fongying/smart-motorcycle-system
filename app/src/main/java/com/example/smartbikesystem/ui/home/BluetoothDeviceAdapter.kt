@@ -4,21 +4,16 @@ import android.bluetooth.BluetoothDevice
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.example.smartbikesystem.R
 
 class BluetoothDeviceAdapter(
-    private var deviceList: List<BluetoothDevice>,
-    private val connectCallback: (BluetoothDevice) -> Unit
+    private val onDeviceSelected: (BluetoothDevice) -> Unit
 ) : RecyclerView.Adapter<BluetoothDeviceAdapter.DeviceViewHolder>() {
 
-    class DeviceViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val deviceName: TextView = view.findViewById(R.id.device_name)
-        val deviceAddress: TextView = view.findViewById(R.id.device_address)
-        val connectButton: Button = view.findViewById(R.id.connect_button)
-    }
+    private val devices = mutableListOf<BluetoothDevice>()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DeviceViewHolder {
         val view = LayoutInflater.from(parent.context)
@@ -27,20 +22,44 @@ class BluetoothDeviceAdapter(
     }
 
     override fun onBindViewHolder(holder: DeviceViewHolder, position: Int) {
-        val device = deviceList[position]
-        holder.deviceName.text = device.name ?: "未知設備"
-        holder.deviceAddress.text = device.address
-        holder.connectButton.setOnClickListener {
-            connectCallback(device)
+        val device = devices[position]
+        holder.deviceName.text = device.name ?: "Unknown Device"  // 處理空名稱
+        holder.itemView.setOnClickListener {
+            if (holder.adapterPosition != RecyclerView.NO_POSITION) {
+                onDeviceSelected(device)
+            }
         }
     }
 
-    override fun getItemCount(): Int {
-        return deviceList.size
+    override fun getItemCount(): Int = devices.size
+
+    fun updateDevices(deviceList: List<BluetoothDevice>) {
+        val diffCallback = DeviceDiffCallback(devices, deviceList)
+        val diffResult = DiffUtil.calculateDiff(diffCallback)
+        devices.clear()
+        devices.addAll(deviceList)
+        diffResult.dispatchUpdatesTo(this)
     }
 
-    fun updateDevices(newDevices: List<BluetoothDevice>) {
-        deviceList = newDevices
-        notifyDataSetChanged()
+    class DeviceViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val deviceName: TextView = view.findViewById(R.id.device_name)
+    }
+
+    class DeviceDiffCallback(
+        private val oldList: List<BluetoothDevice>,
+        private val newList: List<BluetoothDevice>
+    ) : DiffUtil.Callback() {
+
+        override fun getOldListSize(): Int = oldList.size
+
+        override fun getNewListSize(): Int = newList.size
+
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            return oldList[oldItemPosition].address == newList[newItemPosition].address
+        }
+
+        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            return oldList[oldItemPosition].name == newList[newItemPosition].name
+        }
     }
 }

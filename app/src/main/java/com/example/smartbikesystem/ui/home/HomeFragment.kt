@@ -17,14 +17,14 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.example.smartbikesystem.R
+import com.example.smartbikesystem.databinding.FragmentHomeBinding
 
 class HomeFragment : Fragment() {
 
+    private lateinit var binding: FragmentHomeBinding
     private lateinit var bluetoothAdapter: BluetoothAdapter
-    private lateinit var deviceList: RecyclerView
     private lateinit var deviceAdapter: BluetoothDeviceAdapter
     private var devices: MutableList<BluetoothDevice> = mutableListOf()
 
@@ -46,8 +46,9 @@ class HomeFragment : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        return inflater.inflate(R.layout.fragment_home, container, false)
+    ): View {
+        binding = FragmentHomeBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -56,17 +57,16 @@ class HomeFragment : Fragment() {
         // 初始化藍牙適配器
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
 
+        // 初始化 RecyclerView
+        binding.bluetoothDeviceList.layoutManager = LinearLayoutManager(requireContext())
+        deviceAdapter = BluetoothDeviceAdapter { device ->
+            // 連接按鈕點擊邏輯
+            connectToDevice(device)
+        }
+        binding.bluetoothDeviceList.adapter = deviceAdapter
+
         // 檢查藍牙是否開啟
         if (bluetoothAdapter.isEnabled) {
-            // 初始化RecyclerView
-            deviceList = view.findViewById(R.id.bluetooth_device_list)
-            deviceList.layoutManager = LinearLayoutManager(requireContext())
-            deviceAdapter = BluetoothDeviceAdapter(devices) { device ->
-                // 連接按鈕點擊邏輯
-                connectToDevice(device)
-            }
-            deviceList.adapter = deviceAdapter
-
             // 檢查藍牙權限
             checkBluetoothPermission()
         } else {
@@ -74,7 +74,24 @@ class HomeFragment : Fragment() {
             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
             requestBluetoothEnableLauncher.launch(enableBtIntent)
         }
+
+        // 搜尋藍牙裝置按鈕
+        binding.searchDevices.setOnClickListener {
+            checkBluetoothPermission()
+        }
     }
+
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val allGranted = permissions.entries.all { it.value }
+            if (allGranted) {
+                // 權限已授權，繼續執行
+                displayPairedDevices()
+                scanForNewDevices()
+            } else {
+                Toast.makeText(context, "需要藍牙權限來顯示設備", Toast.LENGTH_SHORT).show()
+            }
+        }
 
     private fun checkBluetoothPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -87,13 +104,11 @@ class HomeFragment : Fragment() {
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
                 // 請求藍牙相關權限
-                ActivityCompat.requestPermissions(
-                    requireActivity(),
+                requestPermissionLauncher.launch(
                     arrayOf(
                         Manifest.permission.BLUETOOTH_CONNECT,
                         Manifest.permission.BLUETOOTH_SCAN
-                    ),
-                    REQUEST_BLUETOOTH_PERMISSION
+                    )
                 )
             } else {
                 // 權限已授權，開始掃描
@@ -101,7 +116,7 @@ class HomeFragment : Fragment() {
                 scanForNewDevices()
             }
         } else {
-            // 對於 Android 12 以下版本，不需要請求這些權限
+            // Android 12 以下版本不需要這些權限
             displayPairedDevices()
             scanForNewDevices()
         }
@@ -168,7 +183,9 @@ class HomeFragment : Fragment() {
     }
 
     private fun connectToDevice(device: BluetoothDevice) {
-        // 實作藍牙連接邏輯
+        // 使用 Safe Args 導航到 SensorFragment
+        val action = HomeFragmentDirections.actionHomeFragmentToSensorFragment()
+        findNavController().navigate(action)
     }
 
     // 藍牙掃描結果的 BroadcastReceiver
@@ -177,7 +194,7 @@ class HomeFragment : Fragment() {
             val action: String? = intent?.action
             if (BluetoothDevice.ACTION_FOUND == action) {
                 val device: BluetoothDevice? =
-                    intent?.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
                 device?.let {
                     if (!isDeviceAlreadyAdded(it)) {
                         devices.add(it)
