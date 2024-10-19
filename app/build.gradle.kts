@@ -48,7 +48,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.androidx.navigation.ui.ktx)
-    implementation("androidx.recyclerview:recyclerview:1.2.1") // 如果你使用 RecyclerView
+    implementation("androidx.recyclerview:recyclerview:1.2.1")
+    implementation(libs.play.services.maps) // 如果你使用 RecyclerView
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.android.gms:play-services-location:21.0.1")
 
 
     testImplementation(libs.junit)

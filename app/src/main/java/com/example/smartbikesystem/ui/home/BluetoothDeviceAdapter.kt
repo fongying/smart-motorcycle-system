@@ -4,16 +4,19 @@ import android.bluetooth.BluetoothDevice
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.example.smartbikesystem.R
 
 class BluetoothDeviceAdapter(
-    private val onDeviceSelected: (BluetoothDevice) -> Unit
+    private val onDeviceSelected: (BluetoothDevice) -> Unit,
+    private val onConnectClicked: (BluetoothDevice) -> Unit
 ) : RecyclerView.Adapter<BluetoothDeviceAdapter.DeviceViewHolder>() {
 
     private val devices = mutableListOf<BluetoothDevice>()
+    private val connectedDevices = mutableSetOf<String>()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DeviceViewHolder {
         val view = LayoutInflater.from(parent.context)
@@ -23,12 +26,7 @@ class BluetoothDeviceAdapter(
 
     override fun onBindViewHolder(holder: DeviceViewHolder, position: Int) {
         val device = devices[position]
-        holder.deviceName.text = device.name ?: "Unknown Device"  // 處理空名稱
-        holder.itemView.setOnClickListener {
-            if (holder.adapterPosition != RecyclerView.NO_POSITION) {
-                onDeviceSelected(device)
-            }
-        }
+        holder.bind(device)
     }
 
     override fun getItemCount(): Int = devices.size
@@ -41,8 +39,38 @@ class BluetoothDeviceAdapter(
         diffResult.dispatchUpdatesTo(this)
     }
 
-    class DeviceViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val deviceName: TextView = view.findViewById(R.id.device_name)
+    fun updateConnectionState(deviceAddress: String, isConnected: Boolean) {
+        if (isConnected) {
+            connectedDevices.add(deviceAddress)
+        } else {
+            connectedDevices.remove(deviceAddress)
+        }
+        notifyDataSetChanged()
+    }
+
+    inner class DeviceViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val deviceName: TextView = itemView.findViewById(R.id.device_name)
+        val connectButton: Button = itemView.findViewById(R.id.connect_button)
+
+        fun bind(device: BluetoothDevice) {
+            deviceName.text = device.name ?: "Unknown Device"
+            connectButton.setOnClickListener {
+                onConnectClicked(device)
+            }
+
+            itemView.setOnClickListener {
+                if (adapterPosition != RecyclerView.NO_POSITION) {
+                    onDeviceSelected(device)
+                }
+            }
+
+            // 根據連線狀態改變外框顏色
+            if (connectedDevices.contains(device.address)) {
+                itemView.setBackgroundResource(R.drawable.green_border) // 綠色外框
+            } else {
+                itemView.setBackgroundResource(R.drawable.red_border) // 紅色外框
+            }
+        }
     }
 
     class DeviceDiffCallback(

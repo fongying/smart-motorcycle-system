@@ -33,7 +33,7 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
                 Log.d(TAG, "OBD II 連接成功")
                 return
             } catch (e: IOException) {
-                Log.e(TAG, "OBD II 連接失敗, 嘗試次數: ${attempt + 1}", e)
+                Log.e(TAG, "OBD II 連接失敗, 嘗試次數: \${attempt + 1}", e)
                 close()
                 attempt++
                 Thread.sleep(delayMillis) // 延遲後再次嘗試
@@ -41,6 +41,7 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
         }
         Log.e(TAG, "OBD II 連接失敗，超出重試次數")
     }
+
     fun isConnected(): Boolean {
         return bluetoothSocket?.isConnected ?: false
     }
@@ -107,7 +108,7 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
     }
 
     fun parseVehicleSpeed(response: String): Int {
-        return parseOBDResponse(response, "41 0D")
+        return parseOBDResponse(response, "410D")
     }
 
     // 引擎轉速解析
@@ -116,7 +117,7 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
     }
 
     fun parseEngineRPM(response: String): Int {
-        return parseOBDResponse(response, "41 0C")
+        return parseOBDResponse(response, "410C")
     }
 
     // 引擎冷卻液溫度解析
@@ -125,7 +126,7 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
     }
 
     fun parseEngineTemp(response: String): Int {
-        return parseOBDResponse(response, "41 05")
+        return parseOBDResponse(response, "4105")
     }
 
     // 電瓶電壓解析
@@ -154,11 +155,9 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
         val cleanResponse = response.replace(">", "").trim()
         val bytes = cleanResponse.split(" ").filter { it.isNotBlank() }
 
-        // 確保解析時不會有位移錯誤，避免 IndexOutOfBoundsException
-        val index = bytes.indexOfFirst { it == expectedPrefix.split(" ")[1] }
-        return if (index != -1 && bytes.size > index + 2) {
-            try {
-                val hexValue = bytes[index + 2]
+        if (bytes.size >= 3 && bytes[0] == expectedPrefix.substring(0, 2) && bytes[1] == expectedPrefix.substring(2)) {
+            return try {
+                val hexValue = bytes[2]
                 Log.d(TAG, "解析到的數值: $hexValue")
                 Integer.parseInt(hexValue, 16)
             } catch (e: NumberFormatException) {
@@ -167,7 +166,7 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
             }
         } else {
             Log.e(TAG, "無效的回應: $response")
-            -1
+            return -1
         }
     }
 

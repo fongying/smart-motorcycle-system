@@ -2,6 +2,7 @@ package com.example.smartbikesystem
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.example.smartbikesystem.databinding.ActivityMainBinding
@@ -12,6 +13,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 強制亮色模式
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+
+        setContentView(R.layout.activity_main)
 
         // 使用 ViewBinding 綁定佈局
         binding = ActivityMainBinding.inflate(layoutInflater)

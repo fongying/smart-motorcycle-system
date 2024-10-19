@@ -20,6 +20,7 @@ import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.smartbikesystem.databinding.FragmentHomeBinding
+import com.example.smartbikesystem.obdii.ObdIIManager
 
 class HomeFragment : Fragment() {
 
@@ -27,9 +28,6 @@ class HomeFragment : Fragment() {
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private lateinit var deviceAdapter: BluetoothDeviceAdapter
     private var devices: MutableList<BluetoothDevice> = mutableListOf()
-
-    // 權限請求代碼
-    private val REQUEST_BLUETOOTH_PERMISSION = 1
 
     // 用於處理藍牙啟用的 ActivityResultLauncher
     private val requestBluetoothEnableLauncher =
@@ -40,6 +38,19 @@ class HomeFragment : Fragment() {
             } else {
                 // 藍牙未啟用
                 Toast.makeText(requireContext(), "請啟用藍牙", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+    // 用於請求藍牙權限的 Launcher
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val allGranted = permissions.entries.all { it.value }
+            if (allGranted) {
+                // 權限已授權，繼續執行
+                displayPairedDevices()
+                scanForNewDevices()
+            } else {
+                Toast.makeText(context, "需要藍牙權限來顯示設備", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -80,18 +91,6 @@ class HomeFragment : Fragment() {
             checkBluetoothPermission()
         }
     }
-
-    private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-            val allGranted = permissions.entries.all { it.value }
-            if (allGranted) {
-                // 權限已授權，繼續執行
-                displayPairedDevices()
-                scanForNewDevices()
-            } else {
-                Toast.makeText(context, "需要藍牙權限來顯示設備", Toast.LENGTH_SHORT).show()
-            }
-        }
 
     private fun checkBluetoothPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -163,29 +162,23 @@ class HomeFragment : Fragment() {
         return devices.any { it.address == device.address }
     }
 
-    // 處理權限請求結果
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_BLUETOOTH_PERMISSION) {
-            if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                // 權限已授權，繼續執行
-                displayPairedDevices()
-                scanForNewDevices()
-            } else {
-                // 權限被拒絕
-                Toast.makeText(context, "需要藍牙權限來顯示設備", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
     private fun connectToDevice(device: BluetoothDevice) {
-        // 使用 Safe Args 導航到 SensorFragment
-        val action = HomeFragmentDirections.actionHomeFragmentToSensorFragment()
-        findNavController().navigate(action)
+        // 嘗試建立 Bluetooth 連接
+        val obdIIManager = ObdIIManager(device)
+        obdIIManager.connect()
+
+        if (obdIIManager.isConnected()) {
+            Toast.makeText(requireContext(), "設備連接成功", Toast.LENGTH_SHORT).show()
+
+            // 更新設備的外框顏色為綠色
+            deviceAdapter.updateConnectionState(device.address, true)
+
+            // 使用 Safe Args 導航到 SensorFragment
+            val action = HomeFragmentDirections.actionHomeFragmentToSensorFragment()
+            findNavController().navigate(action)
+        } else {
+            Toast.makeText(requireContext(), "無法連接設備", Toast.LENGTH_SHORT).show()
+        }
     }
 
     // 藍牙掃描結果的 BroadcastReceiver
