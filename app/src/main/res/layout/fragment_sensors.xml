@@ -2,29 +2,47 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:gravity="center">
 
     <TextView
         android:id="@+id/speedTextView"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="車速: 0 km/h"/>
+        android:layout_marginBottom="8dp"
+        android:text="車速: 0 km/h"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:gravity="center"/>
 
     <TextView
         android:id="@+id/rpmTextView"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="轉速: 0"/>
+        android:layout_marginBottom="8dp"
+        android:text="轉速: 0"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:gravity="center"/>
 
     <TextView
         android:id="@+id/tempTextView"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="引擎溫度: 0 °C"/>
+        android:layout_marginBottom="8dp"
+        android:text="引擎溫度: 0 °C"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:gravity="center"/>
 
     <TextView
         android:id="@+id/voltageTextView"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="電瓶電壓: 0 V"/>
+        android:layout_marginBottom="8dp"
+        android:text="電瓶電壓: 0 V"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:gravity="center"/>
 </LinearLayout>

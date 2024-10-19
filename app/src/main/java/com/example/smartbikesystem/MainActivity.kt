@@ -17,18 +17,26 @@ class MainActivity : AppCompatActivity() {
         // 強制亮色模式
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
 
-        setContentView(R.layout.activity_main)
-
         // 使用 ViewBinding 綁定佈局
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         // 設置 NavController 與 BottomNavigationView 的關聯
-        val navHostFragment =
-            supportFragmentManager.findFragmentById(R.id.nav_host_fragment_activity_main) as NavHostFragment
-        val navController = navHostFragment.navController
+        val navHostFragment = supportFragmentManager
+            .findFragmentById(R.id.nav_host_fragment_activity_main) as? NavHostFragment
 
-        // 設置底部導航欄與 NavController 的關聯
-        binding.navView.setupWithNavController(navController)
+        if (navHostFragment != null) {
+            val navController = navHostFragment.navController
+            binding.navView.setupWithNavController(navController)
+        } else {
+            // 如果 NavHostFragment 找不到，顯示錯誤或記錄日誌
+            showError("NavHostFragment not found.")
+        }
+    }
+
+    private fun showError(message: String) {
+        // 在這裡你可以顯示錯誤對話框或記錄日誌
+        // 這樣可以避免應用在找不到 Fragment 時崩潰
+        println(message)  // 或者使用 Log.e("MainActivity", message)
     }
 }

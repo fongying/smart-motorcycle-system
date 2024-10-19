@@ -21,6 +21,10 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.smartbikesystem.databinding.FragmentHomeBinding
 import com.example.smartbikesystem.obdii.ObdIIManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class HomeFragment : Fragment() {
 
@@ -70,18 +74,22 @@ class HomeFragment : Fragment() {
 
         // 初始化 RecyclerView
         binding.bluetoothDeviceList.layoutManager = LinearLayoutManager(requireContext())
-        deviceAdapter = BluetoothDeviceAdapter { device ->
-            // 連接按鈕點擊邏輯
-            connectToDevice(device)
-        }
+        deviceAdapter = BluetoothDeviceAdapter(
+            onDeviceSelected = { device ->
+                // 點擊項目時的邏輯
+                connectToDevice(device)
+            },
+            onConnectClicked = { device ->
+                // 點擊連接按鈕的邏輯
+                connectToDevice(device)
+            }
+        )
         binding.bluetoothDeviceList.adapter = deviceAdapter
 
         // 檢查藍牙是否開啟
         if (bluetoothAdapter.isEnabled) {
-            // 檢查藍牙權限
             checkBluetoothPermission()
         } else {
-            // 如果藍牙未開啟，請求用戶啟用藍牙
             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
             requestBluetoothEnableLauncher.launch(enableBtIntent)
         }
@@ -162,24 +170,30 @@ class HomeFragment : Fragment() {
         return devices.any { it.address == device.address }
     }
 
+    private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
     private fun connectToDevice(device: BluetoothDevice) {
-        // 嘗試建立 Bluetooth 連接
-        val obdIIManager = ObdIIManager(device)
-        obdIIManager.connect()
+        coroutineScope.launch {
+            val obdIIManager = ObdIIManager(device)
+            obdIIManager.connect()
 
-        if (obdIIManager.isConnected()) {
-            Toast.makeText(requireContext(), "設備連接成功", Toast.LENGTH_SHORT).show()
-
-            // 更新設備的外框顏色為綠色
-            deviceAdapter.updateConnectionState(device.address, true)
-
-            // 使用 Safe Args 導航到 SensorFragment
-            val action = HomeFragmentDirections.actionHomeFragmentToSensorFragment()
-            findNavController().navigate(action)
-        } else {
-            Toast.makeText(requireContext(), "無法連接設備", Toast.LENGTH_SHORT).show()
+            if (obdIIManager.isConnected()) {
+                val result = obdIIManager.sendAndLogCommand("0100")  // 測試指令
+                if (result.isNotEmpty()) {
+                    Toast.makeText(requireContext(), "設備連接成功", Toast.LENGTH_SHORT).show()
+                    deviceAdapter.updateConnectionState(device.address, true)
+                    val action = HomeFragmentDirections.actionHomeFragmentToSensorFragment()
+                    findNavController().navigate(action)
+                } else {
+                    Toast.makeText(requireContext(), "無法傳輸資料", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(requireContext(), "無法連接設備", Toast.LENGTH_SHORT).show()
+            }
         }
     }
+
+
 
     // 藍牙掃描結果的 BroadcastReceiver
     private val receiver = object : BroadcastReceiver() {

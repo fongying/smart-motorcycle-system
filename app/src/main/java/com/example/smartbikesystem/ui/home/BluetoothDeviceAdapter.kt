@@ -59,16 +59,15 @@ class BluetoothDeviceAdapter(
             }
 
             itemView.setOnClickListener {
-                if (adapterPosition != RecyclerView.NO_POSITION) {
+                if (bindingAdapterPosition != RecyclerView.NO_POSITION) {
                     onDeviceSelected(device)
                 }
             }
 
-            // 根據連線狀態改變外框顏色
             if (connectedDevices.contains(device.address)) {
-                itemView.setBackgroundResource(R.drawable.green_border) // 綠色外框
+                itemView.setBackgroundResource(R.drawable.green_border)
             } else {
-                itemView.setBackgroundResource(R.drawable.red_border) // 紅色外框
+                itemView.setBackgroundResource(R.drawable.red_border)
             }
         }
     }
