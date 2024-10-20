@@ -32,4 +32,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:menu="@menu/bottom_nav_menu" />
 
+
+
 </androidx.constraintlayout.widget.ConstraintLayout>

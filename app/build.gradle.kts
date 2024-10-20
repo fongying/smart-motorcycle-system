@@ -52,6 +52,7 @@ dependencies {
     implementation(libs.play.services.maps) // 如果你使用 RecyclerView
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-location:21.0.1")
+    implementation(libs.androidx.ui.text.android)
 
 
     testImplementation(libs.junit)

@@ -8,112 +8,140 @@
     android:gravity="center"
     android:background="#1E88E5">
 
-    <TableLayout
+    <GridLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:rowCount="3"
+        android:columnCount="2"
         android:layout_gravity="center"
-        android:stretchColumns="*">
+        android:layout_margin="16dp">
 
-        <TableRow>
-            <LinearLayout
-                android:layout_width="120dp"
-                android:layout_height="120dp"
-                android:orientation="vertical"
-                android:padding="8dp"
-                android:gravity="center"
-                android:layout_margin="8dp"
-                android:background="@android:color/holo_blue_light">
+        <!-- 車速 -->
+        <LinearLayout
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:gravity="center"
+            android:layout_margin="8dp"
+            android:background="@android:color/holo_blue_light">
 
-                <ImageView
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:src="@drawable/speed" />
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/speed" />
 
-                <TextView
-                    android:id="@+id/speedTextView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0 Km/hr"
-                    android:textSize="16sp"
-                    android:textColor="@android:color/black"
-                    android:gravity="center" />
-            </LinearLayout>
+            <TextView
+                android:id="@+id/speedTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 Km/h"
+                android:textSize="16sp"
+                android:textColor="@android:color/black"
+                android:gravity="center" />
+        </LinearLayout>
 
-            <LinearLayout
-                android:layout_width="120dp"
-                android:layout_height="120dp"
-                android:orientation="vertical"
-                android:padding="8dp"
-                android:gravity="center"
-                android:layout_margin="8dp"
-                android:background="@android:color/holo_blue_light">
+        <!-- 轉速 -->
+        <LinearLayout
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:gravity="center"
+            android:layout_margin="8dp"
+            android:background="@android:color/holo_blue_light">
 
-                <ImageView
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:src="@drawable/rpm" />
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/rpm" />
 
-                <TextView
-                    android:id="@+id/rpmTextView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0 RPM"
-                    android:textSize="16sp"
-                    android:textColor="@android:color/black"
-                    android:gravity="center" />
-            </LinearLayout>
-        </TableRow>
+            <TextView
+                android:id="@+id/rpmTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 RPM"
+                android:textSize="16sp"
+                android:textColor="@android:color/black"
+                android:gravity="center" />
+        </LinearLayout>
 
-        <TableRow>
-            <LinearLayout
-                android:layout_width="120dp"
-                android:layout_height="120dp"
-                android:orientation="vertical"
-                android:padding="8dp"
-                android:gravity="center"
-                android:layout_margin="8dp"
-                android:background="@android:color/holo_blue_light">
+        <!-- 溫度 -->
+        <LinearLayout
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:gravity="center"
+            android:layout_margin="8dp"
+            android:background="@android:color/holo_blue_light">
 
-                <ImageView
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:src="@drawable/enginetmp" />
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/enginetmp" />
 
-                <TextView
-                    android:id="@+id/tempTextView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0 °C"
-                    android:textSize="16sp"
-                    android:textColor="@android:color/black"
-                    android:gravity="center" />
-            </LinearLayout>
+            <TextView
+                android:id="@+id/tempTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 °C"
+                android:textSize="16sp"
+                android:textColor="@android:color/black"
+                android:gravity="center" />
+        </LinearLayout>
 
-            <LinearLayout
-                android:layout_width="120dp"
-                android:layout_height="120dp"
-                android:orientation="vertical"
-                android:padding="8dp"
-                android:gravity="center"
-                android:layout_margin="8dp"
-                android:background="@android:color/holo_blue_light">
+        <!-- 電壓 -->
+        <LinearLayout
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:gravity="center"
+            android:layout_margin="8dp"
+            android:background="@android:color/holo_blue_light">
 
-                <ImageView
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:src="@drawable/battery" />
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/battery" />
 
-                <TextView
-                    android:id="@+id/voltageTextView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0 V"
-                    android:textSize="16sp"
-                    android:textColor="@android:color/black"
-                    android:gravity="center" />
-            </LinearLayout>
-        </TableRow>
+            <TextView
+                android:id="@+id/voltageTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 V"
+                android:textSize="16sp"
+                android:textColor="@android:color/black"
+                android:gravity="center" />
+        </LinearLayout>
 
-    </TableLayout>
+        <!-- G力 -->
+        <LinearLayout
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:gravity="center"
+            android:layout_margin="8dp"
+            android:background="@android:color/holo_blue_light">
+
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/gravity" />
+
+            <TextView
+                android:id="@+id/gForceTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 g"
+                android:textSize="16sp"
+                android:textColor="@android:color/black"
+                android:gravity="center" />
+        </LinearLayout>
+
+    </GridLayout>
 
 </LinearLayout>
+

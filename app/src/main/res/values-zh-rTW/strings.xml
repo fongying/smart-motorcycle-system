@@ -4,4 +4,7 @@
     <string name="title_home">主菜單</string>
     <string name="title_dashboard">感測器</string>
     <string name="title_map">地圖</string>
+    <string name="obdii_icon_description">OBDII Icon</string>
+    <string name="collision_detection_icon_description">Collision Detection Icon</string>
+    <string name="language_toggle">English</string>
 </resources>

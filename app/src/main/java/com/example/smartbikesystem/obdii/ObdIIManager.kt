@@ -22,73 +22,81 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
         private const val TAG = "ObdIIManager"
     }
 
-    fun connect() {
+    // **連接至 OBD-II 裝置**
+    fun connect(): Boolean {
         try {
             bluetoothSocket = bluetoothDevice.createRfcommSocketToServiceRecord(OBD_UUID)
             bluetoothSocket?.connect()
             inputStream = bluetoothSocket?.inputStream
             outputStream = bluetoothSocket?.outputStream
             Log.d(TAG, "OBD II 連接成功")
+            return true
         } catch (e: IOException) {
-            Log.e(TAG, "OBD II 連接失敗", e)
+            Log.e(TAG, "OBD II 連接失敗: ${e.message}", e)
             close()
+            return false
         }
     }
 
+    // **獲取 OBD-II 數據**
     suspend fun fetchOBDData(): Map<String, Any?> = withContext(Dispatchers.IO) {
         val data = mutableMapOf<String, Any?>()
-        val commands = listOf("010D", "010C", "0105", "ATRV")
+        val commands = listOf("010D", "010C", "0105", "ATRV")  // 每個指令間隔200ms
 
         for (command in commands) {
             val response = sendAndLogCommand(command)
-            val parsedData = parseResponse(command, response)
-            data.putAll(parsedData)
+            if (response.isNotEmpty()) {
+                data.putAll(parseResponse(command, response))
+            } else {
+                Log.e(TAG, "收到空回應，延遲後重新發送指令: $command")
+                delay(200)  // 增加延遲避免過快發送
+                sendAndLogCommand(command)
+            }
+//            delay(200)  // 每個指令間增加200ms延遲
         }
         data
     }
 
+    // **發送指令並記錄回應**
     suspend fun sendAndLogCommand(command: String): List<String> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "發送指令: $command")
-            outputStream?.write((command + "\r").toByteArray())
+            outputStream?.write("$command\r".toByteArray())
 
-            // 等待 OBD 裝置回應，避免立即發送下一個指令
-            delay(200)  // 可根據需要調整延遲時間
+            // 增加延遲以避免指令過於頻繁
+            delay(500)
 
             val buffer = ByteArray(1024)
             val bytesRead = inputStream?.read(buffer) ?: 0
             val response = String(buffer, 0, bytesRead).trim()
 
             Log.d(TAG, "接收到回應: $response")
-
-            if (response.isBlank() || response.contains("STOPPED")) {
-                Log.e(TAG, "收到無效回應: $response")
-                return@withContext emptyList()
-            }
-
-            val cleanedResponse = cleanResponse(response)
-            Log.d(TAG, "清理後的回應: $cleanedResponse")
-            cleanedResponse
+            return@withContext parseMultiResponse(response)
         } catch (e: IOException) {
-            Log.e(TAG, "傳送或接收資料時發生錯誤", e)
-            emptyList()
+            Log.e(TAG, "傳送或接收資料時發生錯誤: ${e.message}", e)
+            return@withContext emptyList()
         }
     }
 
 
-
-    private fun cleanResponse(response: String): List<String> {
-        Log.d(TAG, "正在清理回應: $response")
-        return response.split(">").map { it.trim() }
-            .filter { it.isNotBlank() }
-            .flatMap { it.split("\\s+".toRegex()) }
+    // **解析多條回應**
+    private fun parseMultiResponse(response: String): List<String> {
+        val responses = response.split(">").map { it.trim() }.filter { it.isNotEmpty() }
+        Log.d(TAG, "拆分後的回應: $responses")
+        return responses.flatMap { cleanResponse(it) }
     }
 
-    fun parseResponse(command: String, response: List<String>): Map<String, Any?> {
+    // **清理回應中的雜訊**
+    private fun cleanResponse(response: String): List<String> {
+        return response.split("\\s+".toRegex()).filter { it.isNotEmpty() }
+    }
+
+    // **解析指令回應**
+    private fun parseResponse(command: String, response: List<String>): Map<String, Any?> {
         val result = mutableMapOf<String, Any?>()
 
-        if (response.contains("STOPPED") || response.isEmpty()) {
-            Log.e(TAG, "無效回應或設備停止: $response")
+        if (response.isEmpty() || response.contains("STOPPED")) {
+            Log.e(TAG, "無效或停止的回應: $response")
             return result
         }
 
@@ -98,7 +106,7 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
                     val speedHex = response.getOrNull(3) ?: "00"
                     val speed = speedHex.toIntOrNull(16) ?: 0
                     result["speed"] = speed
-                    Log.d(TAG, "解析車速: $speed km/h (Hex: $speedHex)")
+                    Log.d(TAG, "解析車速: $speed km/h")
                 }
                 "010C" -> {
                     val highByte = response.getOrNull(3)?.toIntOrNull(16) ?: 0
@@ -108,36 +116,35 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
                     Log.d(TAG, "解析轉速: $rpm RPM (高位: $highByte, 低位: $lowByte)")
                 }
                 "0105" -> {
-                    val tempHex = response.getOrNull(3) ?: "00" // 確保我們取得正確的Hex值
+                    val tempHex = response.getOrNull(3) ?: "00"
                     val tempDec = tempHex.toIntOrNull(16) ?: 0 // 將Hex轉為十進位
                     val temp = tempDec - 40 // 減上40度的校正
                     result["temperature"] = temp
-                    Log.d(TAG, "解析溫度: $temp°C (Hex: $tempHex)")
+                    Log.d(TAG, "解析溫度: $temp °C")
                 }
                 "ATRV" -> {
                     val voltageString = response.getOrNull(1)?.replace("V", "")?.trim()
                     val voltage = voltageString?.toDoubleOrNull() ?: 0.0
                     result["voltage"] = voltage
                     Log.d(TAG, "解析電壓: $voltage V")
-
                 }
                 else -> {
                     Log.e(TAG, "未知指令: $command")
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "解析失敗", e)
+            Log.e(TAG, "解析失敗: ${e.message}", e)
         }
 
         return result
     }
 
-
-
+    // **檢查是否已連接**
     fun isConnected(): Boolean {
         return bluetoothSocket?.isConnected ?: false
     }
 
+    // **關閉連接**
     fun close() {
         try {
             inputStream?.close()
@@ -145,7 +152,7 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
             bluetoothSocket?.close()
             Log.d(TAG, "連線已關閉")
         } catch (e: IOException) {
-            Log.e(TAG, "關閉連線時發生錯誤", e)
+            Log.e(TAG, "關閉連線時發生錯誤: ${e.message}", e)
         }
     }
 }
