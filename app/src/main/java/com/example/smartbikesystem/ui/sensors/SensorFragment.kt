@@ -1,10 +1,8 @@
 package com.example.smartbikesystem.ui.sensors
 
-import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -12,7 +10,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
 import com.example.smartbikesystem.R
 import com.example.smartbikesystem.obdii.ObdIIManager
@@ -23,15 +20,12 @@ import java.util.*
 class SensorFragment : Fragment() {
 
     private lateinit var obdIIManager: ObdIIManager
-    private lateinit var collisionDetectionModule: CollisionDetectionModule
-
     private lateinit var speedTextView: TextView
     private lateinit var rpmTextView: TextView
     private lateinit var tempTextView: TextView
     private lateinit var voltageTextView: TextView
     private lateinit var gForceTextView: TextView
 
-    private val PERMISSION_REQUEST_CODE = 1001
     private val obdScope = CoroutineScope(Dispatchers.IO + Job())
     private val esp32Scope = CoroutineScope(Dispatchers.IO + Job())
 
@@ -43,32 +37,26 @@ class SensorFragment : Fragment() {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_sensors, container, false)
 
-        // 初始化 TextView
+        // 初始化所有 UI 元件
         speedTextView = view.findViewById(R.id.speedTextView)
         rpmTextView = view.findViewById(R.id.rpmTextView)
         tempTextView = view.findViewById(R.id.tempTextView)
         voltageTextView = view.findViewById(R.id.voltageTextView)
         gForceTextView = view.findViewById(R.id.gForceTextView)
 
-        collisionDetectionModule = CollisionDetectionModule()
         connectToDevices()
-
         return view
     }
 
     private fun connectToDevices() {
         val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
-        if (!hasBluetoothPermission()) {
-            requestBluetoothPermission()
-            return
-        }
 
         // 連接 OBD-II 裝置
-        val obdDevice = getPairedDevice(bluetoothAdapter, "OBDII")
+        val obdDevice = bluetoothAdapter.bondedDevices.firstOrNull { it.name == "OBDII" }
         obdDevice?.let { connectOBDII(it) } ?: showToast("找不到 OBD II 裝置")
 
-        // 連接 ESP32 裝置
-        val esp32Device = getPairedDevice(bluetoothAdapter, "ESP32_GForce")
+        // 連接 ESP32 裝置 (用於 G 力感測)
+        val esp32Device = bluetoothAdapter.bondedDevices.firstOrNull { it.name == "ESP32_GForce" }
         esp32Device?.let { connectESP32(it) } ?: showToast("找不到 ESP32 裝置")
     }
 
@@ -84,7 +72,7 @@ class SensorFragment : Fragment() {
                     delay(300) // 控制資料更新頻率
                 }
             } else {
-                showToast("無法連接 OBD II 裝置")
+                showToast("無法連接 OBD II")
             }
         }
     }
@@ -115,11 +103,10 @@ class SensorFragment : Fragment() {
                     Log.d("SensorFragment", "ESP32 Received: $receivedData")
 
                     val (gForce, gyroZ) = parseReceivedData(receivedData)
-                    collisionDetectionModule.processSensorData(gForce, gyroZ)
                     updateGForceUI(gForce)
                 }
             } catch (e: Exception) {
-                Log.e("SensorFragment", "Error reading from ESP32: ${e.message}")
+                Log.e("SensorFragment", "ESP32 資料接收錯誤: ${e.message}")
             }
         }
     }
@@ -131,7 +118,7 @@ class SensorFragment : Fragment() {
             val gyroZ = values.getOrNull(1)?.toFloatOrNull() ?: 0f
             Pair(gForce, gyroZ)
         } catch (e: Exception) {
-            Log.e("SensorFragment", "Failed to parse data: $data", e)
+            Log.e("SensorFragment", "解析 ESP32 資料失敗: $data", e)
             Pair(0f, 0f)
         }
     }
@@ -151,24 +138,6 @@ class SensorFragment : Fragment() {
         }
     }
 
-    private fun hasBluetoothPermission(): Boolean {
-        return ActivityCompat.checkSelfPermission(
-            requireContext(), Manifest.permission.BLUETOOTH_CONNECT
-        ) == PackageManager.PERMISSION_GRANTED
-    }
-
-    private fun requestBluetoothPermission() {
-        ActivityCompat.requestPermissions(
-            requireActivity(),
-            arrayOf(Manifest.permission.BLUETOOTH_CONNECT),
-            PERMISSION_REQUEST_CODE
-        )
-    }
-
-    private fun getPairedDevice(adapter: BluetoothAdapter, deviceName: String): BluetoothDevice? {
-        return adapter.bondedDevices.firstOrNull { it.name == deviceName }
-    }
-
     private fun showToast(message: String) {
         requireActivity().runOnUiThread {
             Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
@@ -181,5 +150,6 @@ class SensorFragment : Fragment() {
         esp32Scope.cancel()
         esp32Socket?.close()
         esp32InputStream?.close()
+        obdIIManager.close()
     }
 }
