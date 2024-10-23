@@ -1,5 +1,6 @@
 package com.example.smartbikesystem.obdii
 
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.util.Log
@@ -23,47 +24,81 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
     }
 
     // **連接至 OBD-II 裝置**
-    fun connect(): Boolean {
+    suspend fun connect(): Boolean = withContext(Dispatchers.IO) {
+        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+        if (bluetoothAdapter == null) {
+            Log.e(TAG, "無法取得 BluetoothAdapter")
+            return@withContext false
+        }
+
+        bluetoothAdapter.cancelDiscovery()
+
         try {
             bluetoothSocket = bluetoothDevice.createRfcommSocketToServiceRecord(OBD_UUID)
             bluetoothSocket?.connect()
+
             inputStream = bluetoothSocket?.inputStream
             outputStream = bluetoothSocket?.outputStream
+
             Log.d(TAG, "OBD II 連接成功")
-            return true
+            sendInitializationCommands() // 初始化 OBD-II
+            return@withContext true
         } catch (e: IOException) {
             Log.e(TAG, "OBD II 連接失敗: ${e.message}", e)
             close()
-            return false
+            return@withContext false
+        }
+    }
+
+    // **發送初始化指令**
+    private suspend fun sendInitializationCommands() = withContext(Dispatchers.IO) {
+        val commands = listOf("ATZ", "ATE0")
+        for (command in commands) {
+            try {
+                outputStream?.write("$command\r".toByteArray())
+                delay(500)
+                Log.d(TAG, "發送初始化指令: $command")
+            } catch (e: IOException) {
+                Log.e(TAG, "發送初始化指令失敗: ${e.message}")
+            }
         }
     }
 
     // **獲取 OBD-II 數據**
     suspend fun fetchOBDData(): Map<String, Any?> = withContext(Dispatchers.IO) {
         val data = mutableMapOf<String, Any?>()
-        val commands = listOf("010D", "010C", "0105", "ATRV")  // 每個指令間隔200ms
+        val commands = listOf("010D", "010C", "0105", "ATRV")
 
         for (command in commands) {
-            val response = sendAndLogCommand(command)
+            val response = retryCommand(command)
             if (response.isNotEmpty()) {
+                Log.d(TAG, "成功接收到回應: $response")
                 data.putAll(parseResponse(command, response))
             } else {
-                Log.e(TAG, "收到空回應，延遲後重新發送指令: $command")
-                delay(200)  // 增加延遲避免過快發送
-                sendAndLogCommand(command)
+                Log.e(TAG, "指令 $command 失敗")
             }
-//            delay(200)  // 每個指令間增加200ms延遲
+            delay(200)
         }
-        data
+
+        return@withContext data
+    }
+
+    // **重試指令發送**
+    private suspend fun retryCommand(command: String, maxAttempts: Int = 3): List<String> {
+        for (attempt in 1..maxAttempts) {
+            Log.d(TAG, "發送指令: $command (第 $attempt 次)")
+            val response = sendAndLogCommand(command)
+            if (response.isNotEmpty()) return response
+            Log.e(TAG, "收到空回應，延遲200ms後重試")
+            delay(200)
+        }
+        return emptyList()
     }
 
     // **發送指令並記錄回應**
-    suspend fun sendAndLogCommand(command: String): List<String> = withContext(Dispatchers.IO) {
-        try {
-            Log.d(TAG, "發送指令: $command")
+    private suspend fun sendAndLogCommand(command: String): List<String> = withContext(Dispatchers.IO) {
+        return@withContext try {
             outputStream?.write("$command\r".toByteArray())
-
-            // 增加延遲以避免指令過於頻繁
             delay(500)
 
             val buffer = ByteArray(1024)
@@ -71,66 +106,49 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
             val response = String(buffer, 0, bytesRead).trim()
 
             Log.d(TAG, "接收到回應: $response")
-            return@withContext parseMultiResponse(response)
+            parseMultiResponse(response)
         } catch (e: IOException) {
             Log.e(TAG, "傳送或接收資料時發生錯誤: ${e.message}", e)
-            return@withContext emptyList()
+            emptyList()
         }
     }
 
-
     // **解析多條回應**
     private fun parseMultiResponse(response: String): List<String> {
-        val responses = response.split(">").map { it.trim() }.filter { it.isNotEmpty() }
-        Log.d(TAG, "拆分後的回應: $responses")
-        return responses.flatMap { cleanResponse(it) }
-    }
-
-    // **清理回應中的雜訊**
-    private fun cleanResponse(response: String): List<String> {
-        return response.split("\\s+".toRegex()).filter { it.isNotEmpty() }
+        return response.split(">").map { it.trim() }.filter { it.isNotEmpty() }
     }
 
     // **解析指令回應**
     private fun parseResponse(command: String, response: List<String>): Map<String, Any?> {
         val result = mutableMapOf<String, Any?>()
 
-        if (response.isEmpty() || response.contains("STOPPED")) {
-            Log.e(TAG, "無效或停止的回應: $response")
-            return result
-        }
-
         try {
             when (command) {
-                "010D" -> {
-                    val speedHex = response.getOrNull(3) ?: "00"
-                    val speed = speedHex.toIntOrNull(16) ?: 0
+                "010D" -> { // 車速
+                    val speedHex = response[0].split(" ")[2]
+                    val speed = speedHex.toInt(16)
                     result["speed"] = speed
                     Log.d(TAG, "解析車速: $speed km/h")
                 }
-                "010C" -> {
-                    val highByte = response.getOrNull(3)?.toIntOrNull(16) ?: 0
-                    val lowByte = response.getOrNull(4)?.toIntOrNull(16) ?: 0
-                    val rpm = ((highByte * 256) + lowByte) / 4
+                "010C" -> { // 轉速
+                    val parts = response[0].split(" ")
+                    val rpm = ((parts[2].toInt(16) * 256) + parts[3].toInt(16)) / 4
                     result["rpm"] = rpm
-                    Log.d(TAG, "解析轉速: $rpm RPM (高位: $highByte, 低位: $lowByte)")
+                    Log.d(TAG, "解析轉速: $rpm RPM")
                 }
-                "0105" -> {
-                    val tempHex = response.getOrNull(3) ?: "00"
-                    val tempDec = tempHex.toIntOrNull(16) ?: 0 // 將Hex轉為十進位
-                    val temp = tempDec - 40 // 減上40度的校正
+                "0105" -> { // 溫度
+                    val tempHex = response[0].split(" ")[2]
+                    val temp = tempHex.toInt(16) - 40
                     result["temperature"] = temp
                     Log.d(TAG, "解析溫度: $temp °C")
                 }
-                "ATRV" -> {
-                    val voltageString = response.getOrNull(1)?.replace("V", "")?.trim()
-                    val voltage = voltageString?.toDoubleOrNull() ?: 0.0
+                "ATRV" -> { // 電壓
+                    val voltageString = response[0].removePrefix("ATRV").replace("V", "").trim()
+                    val voltage = voltageString.toDoubleOrNull() ?: 0.0
                     result["voltage"] = voltage
                     Log.d(TAG, "解析電壓: $voltage V")
                 }
-                else -> {
-                    Log.e(TAG, "未知指令: $command")
-                }
+                else -> Log.e(TAG, "未知指令: $command")
             }
         } catch (e: Exception) {
             Log.e(TAG, "解析失敗: ${e.message}", e)
@@ -140,9 +158,7 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
     }
 
     // **檢查是否已連接**
-    fun isConnected(): Boolean {
-        return bluetoothSocket?.isConnected ?: false
-    }
+    fun isConnected(): Boolean = bluetoothSocket?.isConnected == true
 
     // **關閉連接**
     fun close() {

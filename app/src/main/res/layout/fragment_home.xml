@@ -1,49 +1,58 @@
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
-
-    <Button
-        android:id="@+id/languageToggleButton"
-        android:layout_width="108dp"
-        android:layout_height="57dp"
-        android:layout_marginBottom="48dp"
-        android:text="切換語言"
-        app:layout_constraintBottom_toTopOf="@+id/icon_container"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="1.0"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:fillViewport="true">
 
     <LinearLayout
-        android:id="@+id/icon_container"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="80dp"
-        android:orientation="horizontal"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.497"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/languageToggleButton">
+        android:orientation="vertical"
+        android:spacing="8dp">
 
-        <ImageView
-            android:id="@+id/obdiiIcon"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:layout_margin="8dp"
-            android:background="@drawable/disconnected_border"
-            android:contentDescription="@string/obdii_icon_description"
-            android:src="@drawable/ic_car_engine" />
+        <EditText
+            android:id="@+id/editTextUserName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="使用者名稱"
+            android:inputType="textPersonName"
+            android:layout_marginBottom="12dp" />
 
-        <ImageView
-            android:id="@+id/collision_detection_icon"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:layout_margin="8dp"
-            android:background="@drawable/disconnected_border"
-            android:contentDescription="@string/collision_detection_icon_description"
-            android:src="@drawable/ic_microchip" />
+        <EditText
+            android:id="@+id/editTextServerIp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="伺服器 IP"
+            android:inputType="textUri"
+            android:layout_marginBottom="12dp" />
+
+        <EditText
+            android:id="@+id/editTextGForceThreshold"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="G 力觸發閾值 (預設 2G)"
+            android:inputType="numberDecimal"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/saveSettingsButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="儲存設定"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/languageToggleButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="語言切換" />
+
+        <Button
+            android:id="@+id/testAccidentButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="測試事故通報" />
+
     </LinearLayout>
-</androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>
