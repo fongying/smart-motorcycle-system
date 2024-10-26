@@ -13,13 +13,13 @@
         <!-- 定義從 HomeFragment 到 SensorFragment 的導航動作 -->
         <action
             android:id="@+id/action_homeFragment_to_sensorFragment"
-            app:destination="@id/navigation_dashboard" />
+            app:destination="@id/sensorFragment" />
     </fragment>
 
     <fragment
-        android:id="@+id/navigation_dashboard"
+        android:id="@+id/sensorFragment"
         android:name="com.example.smartbikesystem.ui.sensors.SensorFragment"
-        android:label="@string/title_dashboard"
+        android:label="@string/SensorFragment"
         tools:layout="@layout/fragment_sensors" />
 
     <fragment

@@ -21,6 +21,10 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
     companion object {
         private val OBD_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
         private const val TAG = "ObdIIManager"
+        fun getPairedObdDevice(): BluetoothDevice? {
+            val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+            return bluetoothAdapter?.bondedDevices?.firstOrNull { it.name == "OBDII" }
+        }
     }
 
     // **連接至 OBD-II 裝置**
@@ -47,6 +51,26 @@ class ObdIIManager(private val bluetoothDevice: BluetoothDevice) {
             Log.e(TAG, "OBD II 連接失敗: ${e.message}", e)
             close()
             return@withContext false
+        }
+    }
+
+    fun disconnect() {
+        try {
+            bluetoothSocket?.close()
+            Log.d("ObdIIManager", "OBD-II 連接已斷開")
+        } catch (e: IOException) {
+            Log.e("ObdIIManager", "關閉 Socket 時出現錯誤: ${e.message}")
+        } finally {
+            bluetoothSocket = null  // 確保引用被釋放
+        }
+    }
+
+    private fun closeSocket() {
+        try {
+            bluetoothSocket?.close()
+            Log.d("ObdIIManager", "Socket 已成功關閉")
+        } catch (e: IOException) {
+            Log.e("ObdIIManager", "關閉 Socket 時出現錯誤: ${e.message}")
         }
     }
 

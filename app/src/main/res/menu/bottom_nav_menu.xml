@@ -3,9 +3,9 @@
 
     <!-- 將 Sensor 放在第一個 -->
     <item
-        android:id="@+id/navigation_dashboard"
+        android:id="@+id/sensorFragment"
         android:icon="@drawable/ic_dashboard_black_24dp"
-        android:title="@string/title_dashboard" />
+        android:title="@string/SensorFragment" />
 
     <!-- 然後是 Home -->
     <item

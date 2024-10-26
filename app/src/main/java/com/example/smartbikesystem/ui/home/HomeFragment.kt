@@ -1,6 +1,9 @@
 package com.example.smartbikesystem.ui.home
 
 import android.app.AlertDialog
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothSocket
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -13,32 +16,36 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.navigation.fragment.findNavController
+import com.example.smartbikesystem.R
 import com.example.smartbikesystem.databinding.FragmentHomeBinding
-import com.example.smartbikesystem.service.OBDService
+import com.example.smartbikesystem.obdii.ObdIIManager
+import com.example.smartbikesystem.service.GForceViewModel
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
-import okhttp3.FormBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.io.IOException
+import java.io.InputStream
+import java.util.UUID
 
 class HomeFragment : Fragment() {
 
     private lateinit var binding: FragmentHomeBinding
+    private val gForceViewModel: GForceViewModel by activityViewModels()
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private val httpClient: OkHttpClient by lazy { OkHttpClient() }
-    private var obdResponse: String? = null
+    private var esp32Socket: BluetoothSocket? = null
+    private var esp32InputStream: InputStream? = null
 
-    private val obdResponseReceiver = object : BroadcastReceiver() {
+    private val obdConnectionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == OBDService.ACTION_COMMAND_RESPONSE) {
-                obdResponse = intent.getStringExtra(OBDService.EXTRA_RESPONSE)?.trim()
-                Log.d("HomeFragment", "接收到 OBD 回應: $obdResponse")
+            if (intent?.action == "OBD_CONNECTION_STATUS") {
+                val isObdConnected = intent.getBooleanExtra("isConnected", false)
+                Log.d("HomeFragment", "OBD 連接狀態更新為: $isObdConnected")
             }
         }
     }
@@ -52,155 +59,83 @@ class HomeFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
-        startOBDService()
+        connectESP32()
+        gForceViewModel.startMonitoringGForce()
 
-        binding.testAccidentButton.setOnClickListener {
-            val name = binding.editTextUserName.text.toString().ifEmpty { "User" }
-            val ipAddress = binding.editTextServerIp.text.toString().ifEmpty { "192.168.0.100" }
-            val gForce = binding.editTextGForceThreshold.text.toString().ifEmpty { "2.0" }
-            showAccidentAlert(name, ipAddress, gForce.toFloat())
-        }
-    }
+        binding.saveSettingsButton.setOnClickListener {
+            val name = binding.editTextName.text.toString()
+            val ipAddress = binding.editTextIpAddress.text.toString()
+            val gForceThreshold = binding.editTextGForceThreshold.text.toString().toFloatOrNull() ?: 2.0f
 
-    private fun startOBDService() {
-        val intent = Intent(requireContext(), OBDService::class.java)
-        requireContext().startForegroundService(intent)
-        Toast.makeText(requireContext(), "OBD-II Service 已啟動", Toast.LENGTH_SHORT).show()
-    }
+            CoroutineScope(Dispatchers.IO).launch {
+                val location = getCurrentLocation()
+                val latitude = location?.latitude?.toString() ?: "0.0"
+                val longitude = location?.longitude?.toString() ?: "0.0"
 
-    private fun showAccidentAlert(name: String, ipAddress: String, gForce: Float) {
-        AlertDialog.Builder(requireContext())
-            .setTitle("事故警告")
-            .setMessage("偵測到 G 力達到 $gForce G，是否需要通報伺服器？")
-            .setPositiveButton("通報") { _, _ ->
-                CoroutineScope(Dispatchers.IO).launch {
-                    reportAccident(name, ipAddress, gForce)
+                withContext(Dispatchers.Main) {
+                    openSensorFragment(name, ipAddress, latitude, longitude, gForceThreshold)
                 }
             }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
-    private suspend fun reportAccident(name: String, ipAddress: String, gForce: Float) {
-        val location = getCurrentLocation() ?: return
-        val latitude = location.latitude.toString()
-        val longitude = location.longitude.toString()
-
-        val speed = fetchSpeedWithRetry() ?: "0"  // 使用重試機制取得車速
-
-        sendAccidentReport(name, latitude, longitude, speed, ipAddress)
-
-        withContext(Dispatchers.Main) {
-            Toast.makeText(requireContext(), "事故通報成功", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private val responseMutex = Mutex()
-    private suspend fun fetchSpeedWithRetry(): String? {
-        responseMutex.withLock {
-            val maxRetries = 3
-            var attempt = 0
+    private fun connectESP32() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+                val device = bluetoothAdapter.bondedDevices.firstOrNull { it.name == "ESP32" }
+                    ?: throw IOException("找不到已配對的 ESP32 裝置")
 
-            while (attempt < maxRetries) {
-                obdResponse = null
-                sendCommandWithDelay("010D")
+                esp32Socket = device.createRfcommSocketToServiceRecord(
+                    UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+                )
+                esp32Socket?.connect()
+                esp32InputStream = esp32Socket?.inputStream
 
-                Log.d("HomeFragment", "嘗試取得車速 (第 ${attempt + 1} 次)")
-                delay(300)  // 確保每次請求間隔至少 300ms
-
-                if (obdResponse != null) {
-                    val speed = extractSpeedFromResponse(obdResponse!!)
-                    if (speed != null) return speed
-                }
-                attempt++
+                gForceViewModel.setESP32InputStream(esp32InputStream!!)
+                Log.d("HomeFragment", "ESP32 已成功連接")
+            } catch (e: Exception) {
+                Log.e("HomeFragment", "ESP32 連接失敗：${e.message}")
             }
-
-            Log.e("HomeFragment", "無法取得車速，所有重試均失敗")
-            return "0"
         }
     }
 
-    private suspend fun sendCommandWithDelay(command: String) {
-        delay(100)  // 避免 OBD 裝置的間隔限制問題
-        val intent = Intent(requireContext(), OBDService::class.java).apply {
-            action = OBDService.ACTION_SEND_COMMAND
-            putExtra(OBDService.EXTRA_COMMAND, command)
+    override fun onResume() {
+        super.onResume()
+        LocalBroadcastManager.getInstance(requireContext()).apply {
+            registerReceiver(obdConnectionReceiver, IntentFilter("OBD_CONNECTION_STATUS"))
         }
-        requireContext().startService(intent)
     }
 
-    private fun extractSpeedFromResponse(response: String): String? {
-        try {
-            val cleanedResponse = response.replace(">", "").trim()
-            Log.d("HomeFragment", "清理後的封包回應: $cleanedResponse")
+    override fun onPause() {
+        super.onPause()
+        LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(obdConnectionReceiver)
+    }
 
-            val validResponse = cleanedResponse.substringAfter("41 0D", "").trim()
-            if (validResponse.isBlank()) {
-                Log.e("HomeFragment", "無法找到有效的車速資料")
-                return null
-            }
-
-            val parts = validResponse.split(" ").filter { it.isNotBlank() }
-            val speedHex = parts.getOrNull(0) ?: return null
-            val speed = speedHex.toInt(16)
-
-            Log.d("HomeFragment", "解析出的車速: $speed km/h")
-            return speed.toString()
-        } catch (e: Exception) {
-            Log.e("HomeFragment", "解析車速失敗: ${e.message}")
-            return null
+    private fun openSensorFragment(name: String, ipAddress: String, latitude: String, longitude: String, gForceThreshold: Float) {
+        val bundle = Bundle().apply {
+            putString("name", name)
+            putString("ipAddress", ipAddress)
+            putString("latitude", latitude)
+            putString("longitude", longitude)
+            putFloat("gForceThreshold", gForceThreshold)
         }
+
+        findNavController().navigate(R.id.action_homeFragment_to_sensorFragment, bundle)
     }
 
     private suspend fun getCurrentLocation(): Location? {
         return try {
             fusedLocationClient.lastLocation.await()
         } catch (e: Exception) {
-            Log.e("HomeFragment", "無法取得位置: ${e.message}")
+            Log.e("HomeFragment", "無法獲取位置: ${e.message}")
             null
         }
     }
 
-    private suspend fun sendAccidentReport(
-        name: String, latitude: String, longitude: String, speed: String, ipAddress: String
-    ) {
-        val requestBody = FormBody.Builder()
-            .add("name", name)
-            .add("latitude", latitude)
-            .add("longitude", longitude)
-            .add("speed", speed)
-            .build()
-
-        val request = Request.Builder()
-            .url("http://$ipAddress/accident")
-            .post(requestBody)
-            .build()
-
-        Log.d("HomeFragment", "發送的事故報告: $name, $latitude, $longitude, 車速: $speed km/h")
-
-        try {
-            val response = httpClient.newCall(request).execute()
-            if (response.isSuccessful) {
-                Log.d("HomeFragment", "事故通報成功")
-            } else {
-                Log.e("HomeFragment", "通報失敗: ${response.code} - ${response.message}")
-            }
-        } catch (e: IOException) {
-            Log.e("HomeFragment", "無法通報事故: ${e.message}")
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        val filter = IntentFilter(OBDService.ACTION_COMMAND_RESPONSE)
-        LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
-            obdResponseReceiver, filter
-        )
-    }
-
-    override fun onPause() {
-        super.onPause()
-        LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(obdResponseReceiver)
+    private fun showToast(message: String) {
+        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
     }
 }

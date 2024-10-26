@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">SmartMotorcycleSystem</string>
     <string name="title_home">Home</string>
-    <string name="title_dashboard">Sensor</string>
+    <string name="SensorFragment">Sensor</string>
     <string name="title_map">Maps</string>
     <string name="obdii_icon_description">OBDII Icon</string>
     <string name="collision_detection_icon_description">Collision Detection Icon</string>

@@ -1,6 +1,7 @@
 package com.example.smartbikesystem
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.os.Build
@@ -10,6 +11,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.example.smartbikesystem.databinding.ActivityMainBinding
+import com.example.smartbikesystem.service.GForceService
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
@@ -31,6 +33,10 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // 啟動 GForceService
+        val intent = Intent(this, GForceService::class.java)
+        startService(intent)
+
         // 設置 NavController 與 BottomNavigationView 的關聯
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment_activity_main) as? NavHostFragment
@@ -42,6 +48,12 @@ class MainActivity : AppCompatActivity() {
             // 如果 NavHostFragment 找不到，顯示錯誤或記錄日誌
             showError("NavHostFragment not found.")
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        val intent = Intent(this, GForceService::class.java)
+        stopService(intent)
     }
 
     // 應用已儲存的語言設定

@@ -12,7 +12,7 @@
         android:spacing="8dp">
 
         <EditText
-            android:id="@+id/editTextUserName"
+            android:id="@+id/editTextName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="使用者名稱"
@@ -20,7 +20,7 @@
             android:layout_marginBottom="12dp" />
 
         <EditText
-            android:id="@+id/editTextServerIp"
+            android:id="@+id/editTextIpAddress"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="伺服器 IP"
@@ -41,12 +41,6 @@
             android:layout_height="wrap_content"
             android:text="儲存設定"
             android:layout_marginBottom="12dp" />
-
-        <Button
-            android:id="@+id/languageToggleButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="語言切換" />
 
         <Button
             android:id="@+id/testAccidentButton"
